@@ -110,6 +110,8 @@ Public Class LoginForm
             If reader.HasRows Then
                 MessageBox.Show("Login berhasil!")
                 ' Tambahkan logika untuk melanjutkan ke halaman berikutnya
+                Me.Hide() ' Sembunyikan form login
+                Form2.Show()
             Else
                 MessageBox.Show("Username atau password salah!")
             End If
