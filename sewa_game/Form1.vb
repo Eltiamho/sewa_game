@@ -24,6 +24,10 @@ Public Class LoginForm
     Dim cmd As New MySqlCommand
 
     Sub Koneksi()
+        ' Tutup koneksi terlebih dahulu jika masih terbuka
+        If conn.State = ConnectionState.Open Then
+            conn.Close()
+        End If
         conn.ConnectionString = "server=localhost;user id=root;" & "password=;database=sewa_game;"
         Try
             conn.Open()
@@ -36,42 +40,42 @@ Public Class LoginForm
         End Try
     End Sub
 
-    Public Function GenerateUserID() As String
-        Dim newUserID As String = ""
-        Dim lastUserID As String = ""
+    'Public Function GenerateUserID() As String
+    '    Dim newUserID As String = ""
+    '    Dim lastUserID As String = ""
 
-        ' Step 1: Get the last ID from the database
-        Dim query As String = "SELECT idUser FROM users ORDER BY idUser DESC LIMIT 1"
+    '    ' Step 1: Get the last ID from the database
+    '    Dim query As String = "SELECT idUser FROM users ORDER BY idUser DESC LIMIT 1"
 
+    '    Koneksi()
+    '    Using cmd = New MySqlCommand(query, conn)
+    '        Try
+    '            Dim reader As MySqlDataReader = cmd.ExecuteReader()
+    '            If reader.Read() Then
+    '                lastUserID = reader("idUser").ToString()
+    '            End If
+    '            reader.Close()
+    '        Catch ex As MySqlException
+    '            MessageBox.Show("Error : " & ex.Message)
+    '        Finally
+    '            'Pastikan koneksi ditutup
+    '            conn.Close()
+    '        End Try
+    '    End Using
 
-        Using cmd = New MySqlCommand(query, conn)
-            Try
-                Dim reader As MySqlDataReader = cmd.ExecuteReader()
-                If reader.Read() Then
-                    lastUserID = reader("idUser").ToString()
-                End If
-                reader.Close()
-            Catch ex As MySqlException
-                MessageBox.Show("Error : " & ex.Message)
-            Finally
-                'Pastikan koneksi ditutup
-                conn.Close()
-            End Try
-        End Using
+    '    ' Step 2: Generate new ID based on the last Order ID
+    '    If lastUserID = "" Then
+    '        ' If no records found, start with a base ID
+    '        newUserID = "U001"
+    '    Else
+    '        ' Extract the numeric part and increment it
+    '        Dim numericPart As Integer = Integer.Parse(lastUserID.Substring(3)) ' Extracts the number after "ORD"
+    '        numericPart += 1
+    '        newUserID = "U" & numericPart.ToString("D3") ' Formats to ensure 4 digits, e.g., ORD1002
+    '    End If
 
-        ' Step 2: Generate new ID based on the last Order ID
-        If lastUserID = "" Then
-            ' If no records found, start with a base ID
-            newUserID = "U001"
-        Else
-            ' Extract the numeric part and increment it
-            Dim numericPart As Integer = Integer.Parse(lastUserID.Substring(3)) ' Extracts the number after "ORD"
-            numericPart += 1
-            newUserID = "U" & numericPart.ToString("D3") ' Formats to ensure 4 digits, e.g., ORD1002
-        End If
-
-        Return newUserID
-    End Function
+    '    Return newUserID
+    'End Function
     Private Sub Form1_Load(sender As Object, e As EventArgs) Handles MyBase.Load
 
     End Sub
@@ -89,19 +93,68 @@ Public Class LoginForm
     End Sub
 
     Private Sub button1_Click(sender As Object, e As EventArgs) Handles button1.Click
+        If TextBox2.Text.Length < 8 Then
+            MessageBox.Show("Password harus minimal 8 karakter.")
+            Return
+        End If
 
+        Koneksi()
+        Try
+            Dim query As String = "SELECT * FROM users WHERE username = @Username AND password = @Password"
+            cmd = New MySqlCommand(query, conn)
+            cmd.Parameters.AddWithValue("@Username", TextBox1.Text)
+            cmd.Parameters.AddWithValue("@Password", TextBox2.Text)
+
+            Dim reader As MySqlDataReader = cmd.ExecuteReader()
+
+            If reader.HasRows Then
+                MessageBox.Show("Login berhasil!")
+                ' Tambahkan logika untuk melanjutkan ke halaman berikutnya
+            Else
+                MessageBox.Show("Username atau password salah!")
+            End If
+            reader.Close()
+        Catch ex As MySqlException
+            MessageBox.Show("Error : " & ex.Message)
+        Finally
+            conn.Close()
+        End Try
     End Sub
+    Private Sub ShowPassword_CheckedChanged_1(sender As Object, e As EventArgs) Handles ShowPassword.CheckedChanged
+        If ShowPassword.Checked Then
+            TextBox2.UseSystemPasswordChar = False ' Tampilkan password
+        Else
+            TextBox2.UseSystemPasswordChar = True ' Sembunyikan password
+        End If
+    End Sub
+
+    Private Sub LoginForm_Load(sender As Object, e As EventArgs) Handles MyBase.Load
+        TextBox2.UseSystemPasswordChar = True ' Sembunyikan password secara default
+    End Sub
+
 
     Private Sub Button2_Click(sender As Object, e As EventArgs) Handles Button2.Click
         Koneksi()
-        Dim userId = GenerateUserID()
-        cmd = New MySqlCommand("insert into users values (@userId,'" & username.Text & "', '" & password.Text & "','" & email.Text & "')", conn)
-        cmd.ExecuteNonQuery()
-        MsgBox("Berhasil Registrasi")
+        cmd = New MySqlCommand("insert into users values ('" & username.Text & "', '" & password.Text & "','" & email.Text & "')", conn)
+        Try
+            cmd.ExecuteNonQuery()
+            MsgBox("Berhasil Registrasi")
+        Catch ex As MySqlException
+            MessageBox.Show("Error : " & ex.Message)
+        Finally
+            ' Tutup koneksi setelah eksekusi selesai
+            conn.Close()
+        End Try
         cmd.Dispose()
+        'cmd.ExecuteNonQuery()
+        'MsgBox("Berhasil Registrasi")
+        'cmd.Dispose()
     End Sub
 
     Private Sub TextBox3_TextChanged(sender As Object, e As EventArgs) Handles email.TextChanged
 
     End Sub
+    'sembunyikan password
+
+
 End Class
