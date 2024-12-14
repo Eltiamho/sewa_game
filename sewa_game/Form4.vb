@@ -3,6 +3,9 @@ Imports System.Drawing.Text
 Imports MySql.Data.MySqlClient
 
 Public Class Form4
+    Private Username As String
+
+
     Dim conn As MySqlConnection
     Dim cmd As MySqlCommand
     Dim reader As MySqlDataReader
@@ -18,8 +21,39 @@ Public Class Form4
 
     Private Sub Form4_Load(sender As Object, e As EventArgs) Handles MyBase.Load
         Koneksi()
+        TextBoxEmail.Text = "" & LoginForm.mail
         LoadGamesFromDatabase()
+        tId.Text = GenerateOrderID()
+        loadTransaksi()
+        Label3.Text = "Pesanan yang belum dibayar atas email " & LoginForm.mail
     End Sub
+
+    Private Sub loadTransaksi()
+        Try
+            Dim query As String = "SELECT kode_transaksi, id_game,lama_penyewaan,harga_total FROM transaksi_sewa where email_user = @email AND Status = 0;"
+            cmd = New MySqlCommand(query, conn)
+            cmd.Parameters.AddWithValue("@email", LoginForm.mail)
+            reader = cmd.ExecuteReader()
+
+            ' Kosongkan ListView sebelum menambahkan data baru
+            ListView.Items.Clear()
+
+            ' Tambahkan data ke ListView
+            While reader.Read()
+                ' Membuat item baru untuk ListView
+                Dim item As New ListViewItem(reader.Item(0).ToString()) ' kode_transaksi
+                item.SubItems.Add(reader.Item(1).ToString()) ' id_game
+                item.SubItems.Add(reader.Item(2).ToString()) ' lama_penyewaan
+                item.SubItems.Add(reader.Item(3).ToString()) ' harga
+
+                ListView.Items.Add(item) ' Tambahkan item ke ListView
+            End While
+
+        Catch ex As MySqlException
+            MessageBox.Show("Error: " & ex.Message)
+        End Try
+    End Sub
+
     Private Sub LoadGamesFromDatabase()
         Try
             Dim query As String = "SELECT name,id FROM game;"
@@ -69,113 +103,141 @@ Public Class Form4
     Private Sub TextBoxEmail_TextChanged(sender As Object, e As EventArgs) Handles TextBoxEmail.TextChanged
 
     End Sub
-    Private Sub simpan_Click(sender As Object, e As EventArgs) Handles simpan.Click
 
-        Koneksi() ' Pastikan koneksi terbuka
+    Private Sub RefreshForm()
+        tId.Clear() ' Clear the customer name input
+        'tbNama.Focus() ' Set focus back to the customer name TextBox
+        TextBoxEmail.Clear()
+        loadTransaksi()
 
-        If conn.State = ConnectionState.Open Then
-            Dim emailUser As String = TextBoxEmail.Text
-            Dim durasiSewa As Integer = sewa.Value
-            Dim game As String = (listGame.SelectedIndex + 1).ToString() ' Ambil ID game sesuai index checkbox
-            Dim kode As String = GenerateNewID() ' Generate kode transaksi baru
-
-            Try
-                ' Query insert transaksi
-                Dim query As String = "INSERT INTO transaksi_sewa VALUES (@kode_transaksi, @email_user, @id_game, @lama_penyewaan);"
-                cmd = New MySqlCommand(query, conn) ' Buat perintah MySQL
-
-                ' Tambahkan parameter
-                cmd.Parameters.AddWithValue("@kode_transaksi", kode)
-                cmd.Parameters.AddWithValue("@email_user", emailUser)
-                cmd.Parameters.AddWithValue("@id_game", game)
-                cmd.Parameters.AddWithValue("@lama_penyewaan", durasiSewa)
-
-                ' Eksekusi query insert (gunakan ExecuteNonQuery karena ini INSERT query)
-                cmd.ExecuteNonQuery()
-
-                ' Pesan berhasil
-                MessageBox.Show("Berhasil menambah transaksi!")
-            Catch ex As MySqlException
-                MessageBox.Show("Error: " & ex.Message)
-                'Finally
-                'conn.Close() 
-            Finally
-                cmd.Dispose()
-                conn.Close()
-
-            End Try
-
-
-        Else
-            MessageBox.Show("Koneksi database tidak terbuka.")
-        End If
     End Sub
 
-    'Private Sub simpan_Click(sender As Object, e As EventArgs) Handles simpan.Click
-    '    Koneksi()
-    '    Dim emailUser As String = TextBoxEmail.Text
-    '    Dim durasiSewa As String = sewa.Value.ToString()
-    '    Dim game As String = listGame.SelectedIndex + 1.ToString()
-    '    Dim kode As String = GenerateNewID()
-    '    Try
-    '        Dim query As String = "insert into transaksi_sewa values (@kodeTransaksi,@emailUser,@game,@durasiSewa);"
-    '        cmd.Parameters.AddWithValue("@kodeTransaksi", kode)
-    '        cmd.Parameters.AddWithValue("@emailUser", emailUser)
-    '        cmd.Parameters.AddWithValue("@game", game)
-    '        cmd.Parameters.AddWithValue("@durasiSewa", durasiSewa)
 
-    '        cmd = New MySqlCommand(query, conn)
-    '        cmd.ExecuteNonQuery()
-
-    '        ' Tambahkan game ke CheckedListBox
-    '        MessageBox.Show("berhasil menambah transaksi")
-
-    '    Catch ex As MySqlException
-    '        MessageBox.Show("Error: " & ex.Message)
-    '    Finally
-    '        conn.Close() ' Pastikan koneksi ditutup setelah query selesai
-    '    End Try
-
-    'End Sub
-
-    Private Function GenerateNewID() As String
-        Dim newID As String = "T001" ' Default ID pertama jika tabel kosong
-
-
+    Public Sub InsertOrder()
         Koneksi()
+        tId.Text = GenerateOrderID()
+        Dim emailUser As String = TextBoxEmail.Text
+        Dim durasiSewa As Integer = sewa.Value
+        Dim game As String = (listGame.SelectedIndex + 1).ToString() ' Ambil ID game sesuai index checkbox
+        Dim kode As String = tId.Text
+        ' Ambil harga dari game
+        Dim hargaGame As Integer = 0
+        Dim hargaQuery As String = "SELECT price FROM game WHERE id = @id_game"
 
-        Try
-            ' Ambil ID terakhir dari tabel
-            Dim query As String = "SELECT MAX(kode_transaksi) FROM transaksi_sewa"
-            cmd = New MySqlCommand(query, conn)
-            Dim result As Object = cmd.ExecuteScalar()
+        Using hargaCommand As New MySqlCommand(hargaQuery, conn)
+            hargaCommand.Parameters.AddWithValue("@id_game", game)
+            ' Menggunakan ExecuteScalar untuk mendapatkan harga sebagai integer
+            hargaGame = Convert.ToInt32(hargaCommand.ExecuteScalar())
+        End Using
 
-            If result IsNot DBNull.Value Then
-                ' Jika ID terakhir tidak null, ambil ID dan generate ID baru
-                Dim lastID As String = result.ToString()
+        ' Hitung harga total
+        Dim hargaTotal As Integer = hargaGame * durasiSewa
 
-                ' Pisahkan karakter "T" dan angka dari ID terakhir (misal: T001)
-                Dim numberPart As Integer = Integer.Parse(lastID.Substring(1)) ' Mengambil bagian angka
 
-                ' Tambahkan 1 pada angka
-                numberPart += 1
 
-                ' Format angka agar tetap 3 digit (misal: 001, 002, dll.)
-                Dim formattedNumber As String = numberPart.ToString("D3") ' D3 = Format angka menjadi 3 digit
 
-                ' Gabungkan kembali karakter tetap "T" dengan angka baru
-                newID = "T" & formattedNumber
-            End If
-        Catch ex As MySqlException
-            MessageBox.Show("Error: " & ex.Message)
-        Finally
-            conn.Close()
-        End Try
+        ' Query untuk insert
+        Dim query As String = "INSERT INTO transaksi_sewa (kode_transaksi, email_user, id_game, lama_penyewaan, harga_total) VALUES (@kode_transaksi, @email_user, @id_game, @lama_penyewaan, @harga_total)"
+        'Dim query As String = "INSERT INTO transaksi_sewa (kode_transaksi,email_user,id_game,lama_penyewaan,harga_total) VALUES (@kode_transaksi, @email_user, @id_game, @lama_penyewaan,SELECT price FROM game WHERE id = @id_game) * @lama_penyewaan)"
+        'Panggil koneksi dari modul modKoneksi
+        Using command As New MySqlCommand(query, conn)
+            command.Parameters.AddWithValue("@kode_transaksi", kode)
+            command.Parameters.AddWithValue("@email_user", emailUser)
+            command.Parameters.AddWithValue("@id_game", game)
+            command.Parameters.AddWithValue("@lama_penyewaan", durasiSewa)
+            command.Parameters.AddWithValue("@harga_total", hargaTotal)
 
-        Return newID
+            Try
+                If hargaTotal = 0 Then
+                    MessageBox.Show("Durasi tidak boleh 0 : ")
+
+                Else
+                    command.ExecuteNonQuery()
+                    MessageBox.Show("Sukses menyimpan Transaksi dengan kode: " & kode)
+
+                End If
+
+
+            Catch ex As MySqlException
+                MessageBox.Show("Error : " & ex.Message)
+            Finally
+                ListView.Refresh()
+                'Pastikan koneksi ditutup
+            End Try
+        End Using
+    End Sub
+    Private Sub simpan_Click(sender As Object, e As EventArgs) Handles simpan.Click
+        InsertOrder()
+        loadTransaksi()
+        report.Show()
+
+
+    End Sub
+
+
+
+    Public Function GenerateOrderID() As String
+        Dim newOrderID As String = ""
+        Dim lastOrderID As String = ""
+        Koneksi()
+        ' Step 1: Get the last Order ID from the database
+        Dim query As String = "SELECT kode_transaksi FROM transaksi_sewa ORDER BY kode_transaksi DESC LIMIT 1"
+        Using command As New MySqlCommand(query, conn)
+            Try
+                Dim reader As MySqlDataReader = command.ExecuteReader()
+                If reader.Read() Then
+                    lastOrderID = reader("kode_transaksi").ToString()
+                End If
+                reader.Close()
+            Catch ex As MySqlException
+                MessageBox.Show("Error : " & ex.Message)
+            Finally
+                'Pastikan koneksi ditutup
+            End Try
+        End Using
+
+        ' Step 2: Generate new Order ID based on the last Order ID
+        If lastOrderID = "" Then
+            ' If no records found, start with a base ID
+            newOrderID = "T001"
+        Else
+            ' Extract the numeric part and increment it
+            Dim numericPart As Integer = Integer.Parse(lastOrderID.Substring(1)) ' Extracts the number after "ORD"
+            numericPart += 1
+            newOrderID = "T" & numericPart.ToString("D3") ' Formats to ensure 4 digits, e.g., ORD1002
+        End If
+
+        Return newOrderID
     End Function
 
     Private Sub listGame_SelectedIndexChanged(sender As Object, e As EventArgs) Handles listGame.SelectedIndexChanged
 
+    End Sub
+
+    Private Sub sewa_ValueChanged(sender As Object, e As EventArgs) Handles sewa.ValueChanged
+
+    End Sub
+
+    Private Sub ListView1_SelectedIndexChanged(sender As Object, e As EventArgs) Handles ListView.SelectedIndexChanged
+
+    End Sub
+
+    Private Sub tId_TextChanged(sender As Object, e As EventArgs) Handles tId.TextChanged
+        GenerateOrderID()
+    End Sub
+
+    Private Sub Labelemail_Click(sender As Object, e As EventArgs) Handles Labelemail.Click
+
+    End Sub
+
+    Private Sub Button1_Click(sender As Object, e As EventArgs) Handles Button1.Click
+        Form2.Show()
+
+        Me.Hide()
+
+    End Sub
+
+    Private Sub Button2_Click(sender As Object, e As EventArgs) Handles Button2.Click
+        Payment.Show()
     End Sub
 End Class

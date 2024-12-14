@@ -55,16 +55,37 @@ Public Class Form3
     End Sub
     Private Sub Button1_Click(sender As Object, e As EventArgs) Handles Button1.Click
         Dim sewaForm As New Form4()
+        Dim id As String
+        InitializeComponent()
 
-        ' Tampilkan form baru
-        sewaForm.Show()
+        Koneksi()
+        Dim query As String = "SELECT id, name FROM game WHERE id = @id"
+        cmd = New MySqlCommand(query, conn)
+        cmd.Parameters.AddWithValue("@id", id)
+
 
         ' Tutup form saat ini (Form2)
         Me.Close()
+        'Tampilkan Form baru
+        sewaForm.Show()
     End Sub
 
 
     Private Sub LabelName_Click(sender As Object, e As EventArgs) Handles LabelName.Click
+
+    End Sub
+
+    Private Sub PictureBox1_Click(sender As Object, e As EventArgs) Handles PictureBox1.Click
+
+    End Sub
+
+    Private Sub Button2_Click(sender As Object, e As EventArgs) Handles Button2.Click
+        Form2.Show()
+        ' Tutup form saat ini
+        Me.Close()
+    End Sub
+
+    Private Sub Button3_Click(sender As Object, e As EventArgs) Handles Button3.Click
 
     End Sub
 End Class
